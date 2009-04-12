@@ -16,16 +16,21 @@
 package com.thimbleware.jmemcached;
 
 import org.apache.commons.cli.*;
+import org.apache.zookeeper.ZooKeeper;
+import org.apache.zookeeper.Watcher;
+import org.apache.zookeeper.WatchedEvent;
 
 import java.net.InetSocketAddress;
 import java.text.NumberFormat;
 import java.util.regex.Matcher;
 import java.util.Locale;
+import java.io.IOException;
 
 import com.thimbleware.jmemcached.storage.hash.LRUCacheStorageDelegate;
 import com.thimbleware.jmemcached.storage.mmap.MemoryMappedCacheStorage;
 import com.thimbleware.jmemcached.storage.mmap.MemoryMappedBlockStore;
 import com.thimbleware.jmemcached.storage.CacheStorage;
+import com.thimbleware.jmemcached.storage.zookeeper.ZooKeeperQueueCacheStorage;
 import com.thimbleware.jmemcached.util.Bytes;
 
 
@@ -48,6 +53,7 @@ public class Main {
         options.addOption("m", "memory", true, "max memory to use; in bytes, specify K, kb, M, GB for larger units");
         options.addOption("c", "ceiling", true, "ceiling memory to use; in bytes, specify K, kb, M, GB for larger units");
         options.addOption("l", "listen", true, "Address to listen on");
+        options.addOption("z", "zookeeper", true, "use zookeeper as queue, binding specified host:port");
         options.addOption("s", "size", true, "max items");
         options.addOption("V", false, "Show version number");
         options.addOption("v", false, "verbose (show commands)");
@@ -63,6 +69,16 @@ public class Main {
             HelpFormatter formatter = new HelpFormatter();
             formatter.printHelp("java -jar memcached.jar", options);
             return;
+        }
+
+        String zooKeeperHostname = null;
+        int zooKeeperPort = -1;
+        boolean zooKeeper = false;
+        if (cmdline.hasOption("z")) {
+            zooKeeper = true;
+            String addressSpec[] = cmdline.getOptionValue("z").split(":");
+            zooKeeperHostname = addressSpec[0];
+            zooKeeperPort = Integer.parseInt(addressSpec[1]);
         }
 
         if (cmdline.hasOption("V")) {
@@ -168,9 +184,12 @@ public class Main {
         if (memoryMapped) {
             MemoryMappedBlockStore mappedBlockStore = new MemoryMappedBlockStore((int)maxBytes, mmapFile, blockSize);
             cacheStorage = new MemoryMappedCacheStorage(mappedBlockStore, max_size, (int)ceiling);
-        }
-        else
+        } else if (zooKeeper) {
+            cacheStorage = new ZooKeeperQueueCacheStorage(zooKeeperHostname, zooKeeperPort);
+        } else {
             cacheStorage = new LRUCacheStorageDelegate(max_size, maxBytes, ceiling);
+        }
+
         daemon.setCache(new Cache(cacheStorage));
         daemon.setAddr(addr);
         daemon.setIdleTime(idle);

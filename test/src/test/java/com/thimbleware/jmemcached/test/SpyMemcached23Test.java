@@ -13,6 +13,7 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.apache.mina.util.AvailablePortFinder;
 
 import com.thimbleware.jmemcached.Cache;
 import com.thimbleware.jmemcached.MemCacheDaemon;
@@ -27,10 +28,12 @@ public class SpyMemcached23Test {
 
    private MemCacheDaemon _daemon;
    private MemcachedClient _client;
+    private int port;
 
-   @Before
-   public void setUp() throws Exception {
-       final InetSocketAddress address = new InetSocketAddress( "localhost", 21211 );
+    @Before
+    public void setUp() throws Exception {
+        port = AvailablePortFinder.getNextAvailable();
+        final InetSocketAddress address = new InetSocketAddress( "localhost", port );
        _daemon = createDaemon( address );
        _daemon.start(); // hello side effects
        _client = new MemcachedClient( Arrays.asList( address ) );
@@ -41,18 +44,22 @@ public class SpyMemcached23Test {
        _daemon.stop();
    }
 
-   @Test
-   public void testPresence() {
-       assertNotNull(_daemon.getCache());
-       assertEquals("initial cache is empty", 0, _daemon.getCache().getCurrentItems());
-       assertEquals("initialize size is empty", 0, _daemon.getCache().getCurrentBytes());
-   }
+    @Test
+    public void testSimpleSetGet() throws IOException, InterruptedException {
+        _client.set( "foo", 5000, "bar" );
+        Assert.assertEquals( "bar", _client.get( "foo" ) );
+    }
 
-   @Test
-   public void testConnectDaemon() throws IOException, InterruptedException {
-       _client.set( "foo", 5000, "bar" );
-       Assert.assertEquals( "bar", _client.get( "foo" ) );
-   }
+    @Test
+    public void testBulkOrderedSetGet() throws IOException, InterruptedException {
+        // dump 1000 items in, then retrieve them, and the order should be correct
+        for (int i = 0; i < 1000; i++) {
+            _client.set( "foo" + i, 0, "bar" + i );
+        }
+        for (int i = 0; i < 1000; i++) {
+            Assert.assertEquals( "bar" + i, _client.get( "foo" + i) );
+        }
+    }
 
    private MemCacheDaemon createDaemon( final InetSocketAddress address ) throws IOException {
        final MemCacheDaemon daemon = new MemCacheDaemon();
