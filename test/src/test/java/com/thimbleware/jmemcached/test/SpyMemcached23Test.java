@@ -15,7 +15,6 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.apache.mina.util.AvailablePortFinder;
 
 import com.thimbleware.jmemcached.Cache;
 import com.thimbleware.jmemcached.MemCacheDaemon;
@@ -62,13 +61,11 @@ public class SpyMemcached23Test {
 
     @Test
     public void testBulkGet() throws IOException, InterruptedException, ExecutionException {
-
         ArrayList<String> allStrings = new ArrayList<String>();
         for (int i = 0; i < 10000; i++) {
             _client.set("foo" + i, 360000, "bar" + i);
             allStrings.add("foo" + i);
         }
-
         // doing a regular get, we are just too slow for spymemcached's tolerances... for now
         Future<Map<String, Object>> future = _client.asyncGetBulk(allStrings);
         Map<String, Object> results = future.get();
