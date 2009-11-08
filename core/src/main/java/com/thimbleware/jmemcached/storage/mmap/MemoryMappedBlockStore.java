@@ -31,8 +31,8 @@ public final class MemoryMappedBlockStore extends ByteBufferBlockStore {
      */
     public MemoryMappedBlockStore(long maxBytes, String fileName, int blockSizeBytes) throws IOException {
         super();
-        storage = getMemoryMappedFileStorage(maxBytes, fileName);
-        initialize(storage.capacity(), blockSizeBytes);
+        storageBuffer = getMemoryMappedFileStorage(maxBytes, fileName);
+        initialize(storageBuffer.capacity(), blockSizeBytes);
     }
 
     private MappedByteBuffer getMemoryMappedFileStorage(long maxBytes, String fileName) throws IOException {
@@ -45,17 +45,18 @@ public final class MemoryMappedBlockStore extends ByteBufferBlockStore {
         return fileStorage.getChannel().map(PRIVATE, 0, maxBytes);
     }
 
-    /**
-     * Close the store, destroying all data and closing the backing file
-     * @throws IOException thrown on failure to close file
-     */
-    public void close() throws IOException {
-        super.close();
+    @Override
+    protected void freeResources() throws IOException {
+        super.freeResources();
+
         // close the actual file
         fileStorage.close();
 
         // delete the file; it is no longer of any use
         new File(fileName).delete();
+
+        fileStorage = null;
     }
+
 
 }
